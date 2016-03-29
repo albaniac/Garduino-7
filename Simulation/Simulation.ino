@@ -1,3 +1,4 @@
+const int THERMOMETER_IN = 0;
 const int TEMP_LOW = 15;
 const int TEMP_HIGH = 25;
 const int SIDE_POWER = 1;
@@ -24,18 +25,8 @@ void setup() {
 }
 
 float getTemp(){
-  //fake temperature variations
-  if (greenhouseTemperature > 30){
-    raising = false;
-  }else if (greenhouseTemperature < 10){
-    raising = true;
-  }
-  
-  if (raising){
-    greenhouseTemperature = greenhouseTemperature + 1.0;
-  }else{
-    greenhouseTemperature = greenhouseTemperature - 1.0;
-  }
+  int vIn = analogRead(THERMOMETER_IN);
+  greenhouseTemperature = (vIn * 500L) /1024; //using lm35 directly
 }
 
 void openSides(){
