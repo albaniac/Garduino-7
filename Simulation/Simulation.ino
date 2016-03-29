@@ -8,7 +8,7 @@ const int OPEN = LOW;
 const int ON = HIGH;
 const int OFF = LOW;
 const int ROTATION_TIME = 4000;
-const int SLEEPTIME = 6000;
+const int SLEEPTIME = 60000;
 
 boolean raising = true; //simulate temperature variations
 boolean opened = false;
@@ -17,16 +17,16 @@ float greenhouseTemperature = 20.0;
 void setup() {
   Serial.begin(9600);   // start serial port to show results
   
-    pinMode(SIDE_POWER, OUTPUT); //defines pin as output
-    digitalWrite(SIDE_POWER, LOW); //defines starting state of pin
+  pinMode(SIDE_POWER, OUTPUT); //defines pin as output
+  digitalWrite(SIDE_POWER, LOW); //defines starting state of pin
  
-    pinMode(SIDE_DIRECTION, OUTPUT);
-    digitalWrite(SIDE_DIRECTION, LOW);
+  pinMode(SIDE_DIRECTION, OUTPUT);
+  digitalWrite(SIDE_DIRECTION, LOW);
 }
 
 float getTemp(){
   int vIn = analogRead(THERMOMETER_IN);
-  greenhouseTemperature = (vIn * 500L) /1024; //using lm35 directly
+  greenhouseTemperature = (vIn * 500L) /1024.0; //using lm35 directly
 }
 
 void openSides(){
@@ -53,9 +53,17 @@ void closeSides(){
   }
 }
 
+void formatAndPrintTemp(){
+  char str_temp[6];
+  char temperature[10];
+  dtostrf(greenhouseTemperature, 4, 1, str_temp);
+  sprintf(temperature, "%s C",str_temp);
+  Serial.println(temperature);
+}
+
 void loop() {
   getTemp();
-  Serial.println(greenhouseTemperature);
+  formatAndPrintTemp();
   if (greenhouseTemperature > TEMP_HIGH){
     openSides();
   }else if (greenhouseTemperature < TEMP_LOW){
