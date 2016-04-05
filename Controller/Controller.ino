@@ -1,18 +1,25 @@
 const int THERMOMETER_IN = 0;
-const int TEMP_LOW = 15;
-const int TEMP_HIGH = 25;
+const int TEMP_LOW = 19;
+const int TEMP_HIGH = 21;
 const int SIDE_POWER = 2;
 const int SIDE_DIRECTION = 4;
-const int OPENED_INDICATOR = 7;
-const int MOTOR_ON_INDICATOR = 8;
+const int MOTOR_ON_INDICATOR = 7;
+const int PCT_OPEN_LED0 = 8;
+const int PCT_OPEN_LED1 = 9;
+const int PCT_OPEN_LED2 = 10;
+const int PCT_OPEN_LED3 = 11;
+
 const int CLOSE = HIGH;
 const int OPEN = LOW;
 const int ON = HIGH;
 const int OFF = LOW;
 const int ROTATION_TIME = 4000;
-const int SLEEPTIME = 60000;
+const int PAUSE_TIME = 1000;
+const int SLEEPTIME = 6000;
 
-boolean opened = false;
+const int PCT_OPEN = 25;
+
+int opened = 0;
 float greenhouseTemperature = 20.0;
 
 void setup() {
@@ -24,11 +31,22 @@ void setup() {
   pinMode(SIDE_DIRECTION, OUTPUT);
   digitalWrite(SIDE_DIRECTION, LOW);
   
-  pinMode(OPENED_INDICATOR, OUTPUT);
-  digitalWrite(OPENED_INDICATOR, LOW);
-  
   pinMode(MOTOR_ON_INDICATOR, OUTPUT);
   digitalWrite(MOTOR_ON_INDICATOR, LOW);
+  
+   pinMode(PCT_OPEN_LED0, OUTPUT); 
+   pinMode(PCT_OPEN_LED1, OUTPUT);   
+   pinMode(PCT_OPEN_LED2, OUTPUT); 
+   pinMode(PCT_OPEN_LED3, OUTPUT); 
+  
+  Serial.println("Resetting position");
+  opened = 100;
+  for (int i=0; i<5; i++){
+    closeSides();
+    delay(PAUSE_TIME);
+  }
+  Serial.println("Resetting done");
+
 }
 
 float getTemp(int inPin){
@@ -36,16 +54,40 @@ float getTemp(int inPin){
   return (vIn * 500L) /1024.0; //using lm35 directly
 }
 
+void displayStatus(int pct){
+  int led0 = LOW;
+  int led1 = LOW;
+  int led2 = LOW;
+  int led3 = LOW;
+  
+  if (pct >= 25){
+    led0 = HIGH;
+  }
+  if (pct >= 50){
+    led1 = HIGH;
+  }
+  if (pct >= 75){
+    led2 = HIGH;
+  }
+  if (pct >= 100){
+    led3 = HIGH;
+  }
+  
+  digitalWrite(PCT_OPEN_LED0, led0);
+  digitalWrite(PCT_OPEN_LED1, led1);
+  digitalWrite(PCT_OPEN_LED2, led2);
+  digitalWrite(PCT_OPEN_LED3, led3);
+}
 
-void setOpenedStatus(boolean isOpened){
-  opened = isOpened;
-  digitalWrite(OPENED_INDICATOR, isOpened);
-  Serial.print("Opened:");
+void setOpenedStatus(int pctIncrease){
+  opened += pctIncrease;
+  Serial.print("Open %:");
   Serial.println(opened);
+  displayStatus(opened);
 }
 
 void openSides(){
-  if(!opened){
+  if(opened < 100){
     Serial.println("Opening");
     digitalWrite(SIDE_POWER,ON);
     digitalWrite(SIDE_DIRECTION, OPEN);
@@ -53,21 +95,22 @@ void openSides(){
     delay(ROTATION_TIME);
     digitalWrite(SIDE_POWER, OFF);
     digitalWrite(MOTOR_ON_INDICATOR, LOW);
-    setOpenedStatus(true);
+    setOpenedStatus(PCT_OPEN);
     Serial.println("Done opening");
   }
 }
 
 void closeSides(){
-  if (opened){
+  if (opened > 0){
     Serial.println("Closing");
     digitalWrite(SIDE_POWER, ON);
     digitalWrite(SIDE_DIRECTION, CLOSE);
     digitalWrite(MOTOR_ON_INDICATOR, HIGH);
+    setOpenedStatus(0);
     delay(ROTATION_TIME);
     digitalWrite(SIDE_POWER, OFF);
     digitalWrite(MOTOR_ON_INDICATOR, LOW);
-    setOpenedStatus(false); 
+    setOpenedStatus(-PCT_OPEN); 
     Serial.println("Done closing");
   }
 }
