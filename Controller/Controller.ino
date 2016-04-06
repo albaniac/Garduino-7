@@ -1,13 +1,19 @@
 const int THERMOMETER_IN = 0;
+const int TEMP_HEATING = 18;
 const int TEMP_LOW = 19;
 const int TEMP_HIGH = 21;
+
 const int SIDE_POWER = 2;
 const int SIDE_DIRECTION = 4;
 const int MOTOR_ON_INDICATOR = 7;
-const int PCT_OPEN_LED0 = 8;
+const int HEATING_PIN = 8;
+
+const int PCT_OPEN = 25;
+const int PCT_OPEN_LED0 = 6;
 const int PCT_OPEN_LED1 = 9;
 const int PCT_OPEN_LED2 = 10;
 const int PCT_OPEN_LED3 = 11;
+const int NB_OF_STEPS_IN_ANIMATION = 5; // should be a divider of PCT_OPEN
 
 const int CLOSE = HIGH;
 const int OPEN = LOW;
@@ -15,11 +21,10 @@ const int ON = HIGH;
 const int OFF = LOW;
 const int ROTATION_TIME = 4000;
 const int PAUSE_TIME = 1000;
-const int SLEEPTIME = 6000;
-
-const int PCT_OPEN = 25;
+const int SLEEPTIME = 6000; //60000 for one minute
 
 int opened = 0;
+boolean heating = false;
 float greenhouseTemperature = 20.0;
 
 void setup() {
@@ -33,11 +38,13 @@ void setup() {
   
   pinMode(MOTOR_ON_INDICATOR, OUTPUT);
   digitalWrite(MOTOR_ON_INDICATOR, LOW);
+  pinMode(HEATING_PIN, OUTPUT);
+  digitalWrite(HEATING_PIN, LOW);
   
-   pinMode(PCT_OPEN_LED0, OUTPUT); 
-   pinMode(PCT_OPEN_LED1, OUTPUT);   
-   pinMode(PCT_OPEN_LED2, OUTPUT); 
-   pinMode(PCT_OPEN_LED3, OUTPUT); 
+  pinMode(PCT_OPEN_LED0, OUTPUT); 
+  pinMode(PCT_OPEN_LED1, OUTPUT);   
+  pinMode(PCT_OPEN_LED2, OUTPUT); 
+  pinMode(PCT_OPEN_LED3, OUTPUT); 
   
   Serial.println("Resetting position");
   opened = 100;
@@ -46,7 +53,6 @@ void setup() {
     delay(PAUSE_TIME);
   }
   Serial.println("Resetting done");
-
 }
 
 float getTemp(int inPin){
@@ -55,63 +61,76 @@ float getTemp(int inPin){
 }
 
 void displayStatus(int pct){
-  int led0 = LOW;
-  int led1 = LOW;
-  int led2 = LOW;
-  int led3 = LOW;
-  
-  if (pct >= 25){
-    led0 = HIGH;
+  int led0 = 0;
+  int led1 = 0;
+  int led2 = 0;
+  int led3 = 0;
+  if (pct <= 25){
+    led0 = pct * 4;
+  }else{
+    led0 = 100;
+    if (pct <= 50){
+      led1 = (pct-25) * 4;
+    }else{
+      led1 = 100;
+      if (pct <= 75){
+        led2 = (pct-50) * 4;
+      }else{
+        led2 = 100;
+        if (pct <= 100){
+          led3 = (pct-75) * 4;
+        }
+      }
+    }
   }
-  if (pct >= 50){
-    led1 = HIGH;
-  }
-  if (pct >= 75){
-    led2 = HIGH;
-  }
-  if (pct >= 100){
-    led3 = HIGH;
-  }
-  
-  digitalWrite(PCT_OPEN_LED0, led0);
-  digitalWrite(PCT_OPEN_LED1, led1);
-  digitalWrite(PCT_OPEN_LED2, led2);
-  digitalWrite(PCT_OPEN_LED3, led3);
+  analogWrite(PCT_OPEN_LED0, led0);
+  analogWrite(PCT_OPEN_LED1, led1);
+  analogWrite(PCT_OPEN_LED2, led2);
+  analogWrite(PCT_OPEN_LED3, led3);
 }
 
 void setOpenedStatus(int pctIncrease){
   opened += pctIncrease;
-  Serial.print("Open %:");
+  if(opened < 0) {
+    opened = 0;
+  }else if (opened > 100){
+    opened = 100;
+  }
+  Serial.print("    ");
   Serial.println(opened);
   displayStatus(opened);
 }
 
+void animate(int movement){
+  for (int i=0; i < NB_OF_STEPS_IN_ANIMATION; i++){
+      delay(ROTATION_TIME / NB_OF_STEPS_IN_ANIMATION);
+      setOpenedStatus(movement * PCT_OPEN / NB_OF_STEPS_IN_ANIMATION);
+    };
+}
+
 void openSides(){
   if(opened < 100){
-    Serial.println("Opening");
+    Serial.println("  Opening");
     digitalWrite(SIDE_POWER,ON);
     digitalWrite(SIDE_DIRECTION, OPEN);
     digitalWrite(MOTOR_ON_INDICATOR, HIGH);
-    delay(ROTATION_TIME);
+    animate(1);
     digitalWrite(SIDE_POWER, OFF);
     digitalWrite(MOTOR_ON_INDICATOR, LOW);
-    setOpenedStatus(PCT_OPEN);
-    Serial.println("Done opening");
+    Serial.println("  Done opening");
   }
 }
 
 void closeSides(){
   if (opened > 0){
-    Serial.println("Closing");
+    Serial.println("  Closing");
     digitalWrite(SIDE_POWER, ON);
     digitalWrite(SIDE_DIRECTION, CLOSE);
     digitalWrite(MOTOR_ON_INDICATOR, HIGH);
-    setOpenedStatus(0);
-    delay(ROTATION_TIME);
+    animate(-1);
     digitalWrite(SIDE_POWER, OFF);
     digitalWrite(MOTOR_ON_INDICATOR, LOW);
-    setOpenedStatus(-PCT_OPEN); 
-    Serial.println("Done closing");
+    Serial.println("  Done closing");
   }
 }
 
@@ -123,13 +142,37 @@ void formatAndPrintTemp(float measuredTemperature){
   Serial.println(temperature);
 }
 
+void setHeater(int heaterCommand){
+  if ((heaterCommand == ON) && (heating == false)){
+    Serial.println("  Start heating");
+    heating = true;
+    digitalWrite(HEATING_PIN, heaterCommand);
+  }else if ((heaterCommand == OFF) && (heating == true)){
+    Serial.println("  Stop heating");
+    heating = false;
+    digitalWrite(HEATING_PIN, heaterCommand);
+  }else{
+    Serial.print("  Heating:");
+    Serial.println(heating);
+  }
+}
+
 void loop() {
   greenhouseTemperature = getTemp(THERMOMETER_IN);
   formatAndPrintTemp(greenhouseTemperature);
-  if (greenhouseTemperature > TEMP_HIGH){
-    openSides();
-  }else if (greenhouseTemperature < TEMP_LOW){
-    closeSides();
+  
+  if (greenhouseTemperature <= TEMP_HEATING){
+    setHeater(ON);
+  }else{
+    setHeater(OFF);
   }
+  
+  if ((greenhouseTemperature > TEMP_HEATING) && (greenhouseTemperature < TEMP_LOW)){
+    closeSides();
+  }else if(greenhouseTemperature > TEMP_HIGH){
+    openSides();
+  }
+  Serial.print("  Opened:");
+  Serial.println(opened);
   delay(SLEEPTIME);
 }
